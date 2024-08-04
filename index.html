@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Firebase Web Chat with Groups</title>
+    <script src="https://www.gstatic.com/firebasejs/9.9.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.9.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.9.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.9.0/firebase-storage-compat.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #18191A;
+            color: #E4E6EB;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        #login-container, #group-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #242526;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        #login-container input, #group-container input {
+            margin: 10px 0;
+            padding: 10px;
+            width: 200px;
+            border: none;
+            border-radius: 5px;
+            background: #3A3B3C;
+            color: #E4E6EB;
+        }
+
+        #login-container button, #group-container button {
+            padding: 10px;
+            width: 220px;
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        #login-container button:hover, #group-container button:hover {
+            background: #0056b3;
+        }
+
+        #main-container {
+            display: flex;
+            width: 90%;
+            height: 90%;
+            border: 1px solid #3A3B3C;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        #sidebar {
+            width: 250px;
+            background: #242526;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            justify-content: space-between;
+        }
+
+        #sidebar input {
+            width: calc(100% - 20px);
+            margin: 10px 0;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            background: #3A3B3C;
+            color: #E4E6EB;
+        }
+
+        #sidebar button {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        #sidebar button:hover {
+            background: #0056b3;
+        }
+
+        #sidebar ul {
+            list-style: none;
+            padding: 0;
+            width: 100%;
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
+        #sidebar li {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #3A3B3C;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #sidebar li:hover {
+            background: #3A3B3C;
+        }
+
+        .leave-button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #FF0000;
+            font-size: 1.2em;
+        }
+
+        #chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #18191A;
+        }
+
+        #chat-window {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            border-bottom: 1px solid #3A3B3C;
+        }
+
+        #messages {
+            list-style: none;
+            padding: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #messages li {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 10px;
+            max-width: 60%;
+            word-wrap: break-word;
+        }
+
+        .message-left {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            align-self: flex-start;
+        }
+
+        .message-right {
+            background: linear-gradient(135deg, #ff6a00 0%, #ee0979 100%);
+            color: white;
+            align-self: flex-end;
+        }
+
+        #message-input {
+            width: calc(100% - 150px);
+            border: none;
+            padding: 10px;
+            border-radius: 5px 0 0 5px;
+            background: #3A3B3C;
+            color: #E4E6EB;
+        }
+
+        #send-button, #upload-button {
+            border: none;
+            padding: 10px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border-radius: 0 5px 5px 0;
+        }
+
+        #send-button:hover, #upload-button:hover {
+            background: #0056b3;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        #join-create-prompt {
+            text-align: center;
+            font-size: 1.2em;
+            color: #777;
+        }
+
+        #join-create-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+            background-color: #242526;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+
+        #modal-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            z-index: 999;
+        }
+
+        #join-create-modal input {
+            margin: 10px 0;
+            padding: 10px;
+            width: 200px;
+            border: none;
+            border-radius: 5px;
+            background: #3A3B3C;
+            color: #E4E6EB;
+        }
+
+        #join-create-modal button {
+            padding: 10px;
+            width: 220px;
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        #join-create-modal button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div id="login-container">
+        <input type="text" id="username" placeholder="Username">
+        <input type="email" id="email" placeholder="Email">
+        <input type="password" id="password" placeholder="Password">
+        <button id="login-button">Login</button>
+        <button id="register-button">Register</button>
+    </div>
+    <div id="main-container" style="display:none;">
+        <div id="sidebar">
+            <ul id="group-list"></ul>
+            <div>
+                <input type="text" id="group-name" placeholder="Group Name">
+                <button id="create-group-button">Create Group</button>
+                <button id="join-group-button">Join Group</button>
+            </div>
+        </div>
+        <div id="chat-container">
+            <div id="chat-window">
+                <div id="join-create-prompt">Join or create a group to start chatting.</div>
+                <ul id="messages" style="display:none;"></ul>
+            </div>
+            <div>
+                <input type="text" id="message-input" placeholder="Type a message">
+                <button id="send-button">Send</button>
+                <input type="file" id="file-input" accept="image/*,video/*">
+                <button id="upload-button">Upload</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="join-create-modal">
+        <input type="text" id="modal-group-name" placeholder="Group Name">
+        <button id="modal-create-group-button">Create Group</button>
+        <button id="modal-join-group-button">Join Group</button>
+    </div>
+    <div id="modal-background"></div>
+
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+  apiKey: "AIzaSyAnflAjO_DGtryZdRquk9L7Nas6it6RdmQ",
+  authDomain: "chatboy-c8efe.firebaseapp.com",
+  databaseURL: "https://chatboy-c8efe-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "chatboy-c8efe",
+  storageBucket: "chatboy-c8efe.appspot.com",
+  messagingSenderId: "531624403645",
+  appId: "1:531624403645:web:c8c6c8eea2bc54ab61cdd4"
+};
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+
+        let currentGroupId = null;
+
+        // Authentication
+        document.getElementById('login-button').addEventListener('click', function() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            auth.signInWithEmailAndPassword(email, password).then(userCredential => {
+                document.getElementById('login-container').style.display = 'none';
+                document.getElementById('main-container').style.display = 'flex';
+                fetchGroups();
+            }).catch(error => {
+                console.error("Error logging in:", error);
+            });
+        });
+
+        document.getElementById('register-button').addEventListener('click', function() {
+            const username = document.getElementById('username').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            auth.createUserWithEmailAndPassword(email, password).then(userCredential => {
+                return db.collection('users').doc(userCredential.user.uid).set({
+                    username: username,
+                    email: email
+                });
+            }).then(() => {
+                document.getElementById('login-container').style.display = 'none';
+                document.getElementById('main-container').style.display = 'flex';
+                fetchGroups();
+            }).catch(error => {
+                console.error("Error registering:", error);
+            });
+        });
+
+        // Group Management
+        document.getElementById('create-group-button').addEventListener('click', function() {
+            showModal();
+        });
+
+        document.getElementById('join-group-button').addEventListener('click', function() {
+            showModal();
+        });
+
+        document.getElementById('modal-create-group-button').addEventListener('click', function() {
+            const groupName = document.getElementById('modal-group-name').value;
+            createGroup(groupName);
+        });
+
+        document.getElementById('modal-join-group-button').addEventListener('click', function() {
+            const groupName = document.getElementById('modal-group-name').value;
+            joinGroup(groupName);
+        });
+
+        function fetchGroups() {
+            db.collection('groups').get().then(querySnapshot => {
+                const groupList = document.getElementById('group-list');
+                groupList.innerHTML = '';
+                querySnapshot.forEach(doc => {
+                    const groupName = doc.data().name;
+                    const groupItem = document.createElement('li');
+                    groupItem.textContent = groupName;
+                    groupItem.dataset.groupId = doc.id;
+                    groupItem.innerHTML += `<button class="leave-button" onclick="leaveGroup('${doc.id}')">×</button>`;
+                    groupItem.addEventListener('click', function() {
+                        joinGroup(groupName, doc.id);
+                    });
+                    groupList.appendChild(groupItem);
+                });
+            });
+        }
+
+        function createGroup(groupName) {
+            db.collection('groups').add({
+                name: groupName,
+                members: [auth.currentUser.uid]
+            }).then(docRef => {
+                joinGroup(groupName, docRef.id);
+                closeModal();
+            }).catch(error => {
+                console.error("Error creating group:", error);
+            });
+        }
+
+        function joinGroup(groupName, groupId = null) {
+            if (groupId) {
+                currentGroupId = groupId;
+                db.collection('groups').doc(groupId).update({
+                    members: firebase.firestore.FieldValue.arrayUnion(auth.currentUser.uid)
+                }).then(() => {
+                    loadMessages(groupId);
+                });
+            } else {
+                db.collection('groups').where('name', '==', groupName).get().then(querySnapshot => {
+                    if (!querySnapshot.empty) {
+                        const groupDoc = querySnapshot.docs[0];
+                        joinGroup(groupName, groupDoc.id);
+                    } else {
+                        console.error("Group not found");
+                    }
+                });
+            }
+        }
+
+        function leaveGroup(groupId) {
+            if (groupId) {
+                db.collection('groups').doc(groupId).update({
+                    members: firebase.firestore.FieldValue.arrayRemove(auth.currentUser.uid)
+                }).then(() => {
+                    currentGroupId = null;
+                    document.getElementById('messages').innerHTML = '';
+                    document.getElementById('join-create-prompt').style.display = 'block';
+                    document.getElementById('messages').style.display = 'none';
+                }).catch(error => {
+                    console.error("Error leaving group:", error);
+                });
+            }
+        }
+
+        function loadMessages(groupId) {
+            const messagesList = document.getElementById('messages');
+            messagesList.innerHTML = '';
+            document.getElementById('join-create-prompt').style.display = 'none';
+            messagesList.style.display = 'block';
+            db.collection('groups').doc(groupId).collection('messages').orderBy('timestamp').onSnapshot(snapshot => {
+                snapshot.docChanges().forEach(change => {
+                    if (change.type === 'added') {
+                        displayMessage(change.doc);
+                    }
+                });
+            });
+        }
+
+        function displayMessage(doc) {
+            const message = doc.data();
+            const messageItem = document.createElement('li');
+            if (message.senderId === auth.currentUser.uid) {
+                messageItem.classList.add('message-right');
+            } else {
+                messageItem.classList.add('message-left');
+            }
+
+            // Check if the message contains an image URL
+            if (message.text.startsWith('<a href="') && message.text.includes('</a>')) {
+                messageItem.innerHTML = message.text;
+            } else if (message.text.includes('https://firebasestorage.googleapis.com')) {
+                messageItem.innerHTML = `<img src="${message.text}" alt="Image" style="max-width: 100%; border-radius: 10px;">`;
+            } else {
+                messageItem.innerHTML = message.text;
+            }
+
+            document.getElementById('messages').appendChild(messageItem);
+            messageItem.scrollIntoView();
+        }
+
+        document.getElementById('send-button').addEventListener('click', sendMessage);
+        document.getElementById('message-input').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        function sendMessage() {
+            const messageText = document.getElementById('message-input').value;
+            if (messageText.trim() !== '') {
+                db.collection('groups').doc(currentGroupId).collection('messages').add({
+                    text: messageText,
+                    senderId: auth.currentUser.uid,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                document.getElementById('message-input').value = '';
+            }
+        }
+
+        document.getElementById('upload-button').addEventListener('click', function() {
+            document.getElementById('file-input').click();
+        });
+
+        document.getElementById('file-input').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const storageRef = storage.ref();
+                const fileRef = storageRef.child(`uploads/${currentGroupId}/${file.name}`);
+                fileRef.put(file).then(snapshot => {
+                    fileRef.getDownloadURL().then(url => {
+                        db.collection('groups').doc(currentGroupId).collection('messages').add({
+                            text: url,
+                            senderId: auth.currentUser.uid,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    });
+                });
+            }
+        });
+
+        function showModal() {
+            document.getElementById('modal-background').style.display = 'block';
+            document.getElementById('join-create-modal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('modal-background').style.display = 'none';
+            document.getElementById('join-create-modal').style.display = 'none';
+        }
+
+        document.getElementById('modal-background').addEventListener('click', closeModal);
+    </script>
+</body>
+</html>
